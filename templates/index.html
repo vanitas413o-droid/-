@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>轉盤遊戲</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+        }
+        .input-area {
+            margin-bottom: 20px;
+        }
+        .input-area textarea {
+            width: 300px;
+            height: 150px;
+            font-size: 16px;
+            padding: 10px;
+        }
+        .button {
+            padding: 10px 20px;
+            font-size: 18px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .canvas-container {
+            position: relative;
+            display: inline-block;
+            margin-top: 30px;
+        }
+
+        #wheelCanvas {
+            border: 5px solid #000;
+            border-radius: 50%;
+        }
+
+        .spin-button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            font-size: 20px;
+            padding: 10px 20px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+
+        .result {
+            margin-top: 20px;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .pointer {
+            position: absolute;
+            top: -25px; /* 指針的位置可以調整 */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-bottom: 20px solid red;
+            z-index: 2; /* 確保指針位於轉盤上方 */
+        }
+    </style>
+</head>
+<body>
+
+    <h1>轉盤遊戲</h1>
+    
+    <div class="input-area">
+        <h3>請輸入選項，每行一個：</h3>
+        <form method="POST">
+            <textarea name="options" placeholder="例如：選項 1\n選項 2\n選項 3"></textarea><br>
+            <button class="button" type="submit">生成轉盤</button>
+        </form>
+    </div>
+
+    {% if options %}
+    <div class="canvas-container">
+        <div class="pointer"></div>
+        <canvas id="wheelCanvas" width="400" height="400"></canvas>
+    </div>
+    <br>
+    <button class="spin-button" onclick="spinWheel()">旋轉轉盤</button>
+    <div class="result" id="result"></div>
+    {% endif %}
+
+    <script>
+        // 直接使用從 Flask/Jinja2 傳遞過來的 options
+        const options = {{ options|tojson }};
+        let angle = 0;
+        let segments;
+        let ctx;
+        let currentDegree = 0;
+        let pointerAngle = 0;
+
+        function drawWheel() {
+            const canvas = document.getElementById('wheelCanvas');
+            ctx = canvas.getContext('2d');
+            const radius = canvas.width / 2;
+            const segmentAngle = 360 / options.length; // 每個扇形的角度
+
+            // 清空畫布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 設定轉盤中心
+            ctx.translate(radius, radius);
+            
+            segments = options.map((option, index) => {
+                const startAngle = segmentAngle * index;
+                const endAngle = startAngle + segmentAngle;
+
+                // 畫每個扇形
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.arc(0, 0, radius, (startAngle * Math.PI) / 180, (endAngle * Math.PI) / 180);
+                ctx.fillStyle = index % 2 === 0 ? '#f7f7f7' : '#e7e7e7';
+                ctx.fill();
+
+                // 加入文本
+                ctx.save();
+                ctx.rotate((startAngle + segmentAngle / 2) * Math.PI / 180);
+                ctx.fillStyle = '#000';
+                ctx.font = '16px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(option, radius / 1.5, 0);
+                ctx.restore();
+            });
+        }
+
+        function spinWheel() {
+            const canvas = document.getElementById('wheelCanvas');
+            const spinButton = document.querySelector('.spin-button');
+            const resultDiv = document.getElementById('result');
+            const pointerDiv = document.querySelector('.pointer');
+
+            const randomDegree = Math.floor(Math.random() * 360) + 3600; // 隨機旋轉角度
+
+            // 禁用旋轉按鈕，避免快速連續點擊
+            spinButton.disabled = true;
+
+            // 每次旋轉的動畫
+            let spinAnimation = setInterval(() => {
+                currentDegree += 10; // 逐步增加旋轉角度
+                angle = currentDegree % 360; // 保持在0-360度之間
+
+                canvas.style.transform = `rotate(${angle}deg)`; // 更新轉盤的角度
+                pointerDiv.style.transform = `translateX(-50%) rotate(${angle}deg)`; // 旋轉指針
+
+                if (currentDegree >= randomDegree) {
+                    clearInterval(spinAnimation);
+
+                    // 計算指針指向的選項
+                    const selectedIndex = Math.floor((angle + 90) / (360 / options.length)) % options.length;
+                    resultDiv.innerText = `指針指向：${options[selectedIndex]}`;
+
+                    spinButton.disabled = false; // 旋轉結束後啟用按鈕
+                }
+            }, 10); // 10毫秒更新一次角度
+        }
+
+        // 初始化轉盤
+        window.onload = drawWheel;
+    </script>
+</body>
+</html>
